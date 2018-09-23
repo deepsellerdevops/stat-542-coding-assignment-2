@@ -1,0 +1,129 @@
+---
+title: "Stat 542 Coding Assignment 2"
+author: "Doug Mulley"
+date: "9/18/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(glmnet)
+library(ggplot2)
+library(gridExtra)
+
+rm(list = ls())
+set.seed(9764)
+```
+
+## Part 1: BostonHousing1.data
+
+Load `BostonHousing1.Rdata` which has 16 variables including the response variable `Y`. The data has been pre-processed, so no need to apply any transformation.
+
+```{r}
+load('BostonHousing1.Rdata')
+myData = Housing1
+
+n = nrow(myData)
+p = ncol(myData) - 1
+
+X = data.matrix(myData[,-1])
+Y = myData[,1]
+
+T = 50
+```
+
+1. Repeat  the  following  simulation  50  times.   In  each  iteration,  randomly split the data into two parts, 75% for training and 25% for testing.  fit the model based on the training data and obtain a prediction on the test data, record the mean squared prediction error (MSPE) on the test set, the selected model-size or effect dimension (for Ridge), and the computation time for each procedure.
+
+```{r}
+ntest = round(n * 0.25)
+ntrain = n - ntest
+
+all.test.id = matrix(0, nrow = ntest, ncol = T)
+
+for (t in 1:T) {
+  all.test.id[,t] = sample(1:n, ntest)
+}
+
+model_names = c("Full", 
+                "AIC.F", "AIC.B", 
+                "BIC.F", "BIC.B", 
+                "R.min", "R.1se", 
+                "L.min", "L.1se",
+                "L.Refit")
+
+nmodels = length(model_names)
+
+mspe = matrix(0, T, nomodels)
+colnames(mspe) = model_names
+
+computation_times = matrix(0, T, nmodels)
+colnames(computation_times) = model_names
+
+calculateMSPE <- function (test.id, predictedY) {
+  mean((Y[test.id] - predictedY) ^ 2)
+}
+```
+
+* __Full__
+
+```{r}
+model.index = 1
+
+for (t in 1:T) {
+  time.start = proc.time()
+  
+  test.id = all.test.id[,t]
+  full.model = lm(Y ~ ., data = myData[-test.id,])
+  Ytest.pred = predict(full.model, newdata = myData[test.id,])
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+  
+  mspe[t, model.index] = calculateMSPE(test.id, Ytest.pred)
+}
+```
+
+* __AIC - Forward__
+
+```{r}
+model.index = 2
+
+for (t in 1:T) {
+  time.start = proc.time()
+  test.id = all.test.id[, t]
+  full.model = lm(Y ~ ., data = myData[-test.id, ])
+  stepAIC = step(lm(Y ~ 1, data = myData[-test.id, ]),
+                 list(upper = full.model),
+                 trace = 0,
+                 direction = "forward")
+  Ytest.pred = predict(stepAIC, newdata = myData[test.id, ])
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+  
+  mspe[t, model.index] = calculateMSPE(test.id, Ytest.pred)
+}
+```
+
+* __AIC - Backward__
+
+```{r}
+model.index = 3
+
+for (t in 1:T) {
+  time.start = proc.time()
+  test.id = all.test.id[, t]
+  full.model = lm(Y ~ ., data = myData[-test.id, ])
+  stepAIC = step(full.model,
+                 trace = 0,
+                 direction = "backward")
+  Ytest.pred = predict(stepAIC, newdata = myData[test.id, ])
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+  
+  mspe[t, model.index] = calculateMSPE(test.id, Ytest.pred)
+}
+```
+

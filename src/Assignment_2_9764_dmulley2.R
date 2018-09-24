@@ -269,7 +269,7 @@ boxplot(mspe ~ model,
         main = "Boston housing 1 - Prediction error by method",
         xlab = "Method", 
         las = 2,
-        ylab = "Prediction error")
+        ylab = "Prediction error (%)")
 
 boxplot(modelSize ~ model,
         data = metrics,
@@ -277,6 +277,13 @@ boxplot(modelSize ~ model,
         xlab = "Method",
         las = 2,
         ylab = "Model size")
+
+boxplot(time ~ model,
+        data = metrics,
+        main = "Boston housing 1 - Computation time",
+        xlab = "Method",
+        las = 2,
+        ylab = "Computation time (s)")
 
 # Boston Housing 2
 load('BostonHousing2.Rdata')
@@ -349,6 +356,13 @@ boxplot(modelSize ~ model,
         las = 2,
         ylab = "Model size")
 
+boxplot(time ~ model,
+        data = metrics,
+        main = "Boston housing 2 - Computation time",
+        xlab = "Method",
+        las = 2,
+        ylab = "Computation time (s)")
+
 # Boston Housing 3
 
 load('BostonHousing3.Rdata')
@@ -420,3 +434,10 @@ boxplot(modelSize ~ model,
         xlab = "Method",
         las = 2,
         ylab = "Model size")
+
+boxplot(time ~ model,
+        data = metrics,
+        main = "Boston housing 3 - Computation time",
+        xlab = "Method",
+        las = 2,
+        ylab = "Computation time (s)")

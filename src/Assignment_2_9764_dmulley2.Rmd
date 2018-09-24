@@ -33,7 +33,7 @@ Y = myData[,1]
 T = 50
 ```
 
-1. Repeat  the  following  simulation  50  times.   In  each  iteration,  randomly split the data into two parts, 75% for training and 25% for testing.  fit the model based on the training data and obtain a prediction on the test data, record the mean squared prediction error (MSPE) on the test set, the selected model-size or effect dimension (for Ridge), and the computation time for each procedure.
+a. Repeat  the  following  simulation  50  times.   In  each  iteration,  randomly split the data into two parts, 75% for training and 25% for testing.  fit the model based on the training data and obtain a prediction on the test data, record the mean squared prediction error (MSPE) on the test set, the selected model-size or effect dimension (for Ridge), and the computation time for each procedure.
 
 ```{r}
 ntest = round(n * 0.25)
@@ -54,7 +54,7 @@ model_names = c("Full",
 
 nmodels = length(model_names)
 
-mspe = matrix(0, T, nomodels)
+mspe = matrix(0, T, nmodels)
 colnames(mspe) = model_names
 
 computation_times = matrix(0, T, nmodels)
@@ -62,6 +62,108 @@ colnames(computation_times) = model_names
 
 calculateMSPE <- function (test.id, predictedY) {
   mean((Y[test.id] - predictedY) ^ 2)
+}
+
+predictWithFullModel <- function (t) {
+  test.id = all.test.id[,t]
+  full.model = lm(Y ~ ., data = myData[-test.id,])
+  Ytest.pred = predict(full.model, newdata = myData[test.id,])
+  calculateMSPE(test.id, Ytest.pred)
+}
+
+predictWithAICForward <- function (t) {
+  test.id = all.test.id[, t]
+  full.model = lm(Y ~ ., data = myData[-test.id, ])
+  stepAIC = step(lm(Y ~ 1, data = myData[-test.id, ]),
+                 list(upper = full.model),
+                 trace = 0,
+                 direction = "forward")
+  Ytest.pred = predict(stepAIC, newdata = myData[test.id, ])
+  calculateMSPE(test.id, Ytest.pred)
+}
+
+predictWithAICBackward <- function (t) {
+  test.id = all.test.id[, t]
+  full.model = lm(Y ~ ., data = myData[-test.id, ])
+  stepAIC = step(full.model,
+                 trace = 0,
+                 direction = "backward")
+  Ytest.pred = predict(stepAIC, newdata = myData[test.id, ])
+  calculateMSPE(test.id, Ytest.pred)
+}
+
+predictWithBICForward <- function (t) {
+  test.id = all.test.id[, t]
+  full.model = lm(Y ~ ., data = myData[-test.id, ])
+  stepAIC = step(lm(Y ~ 1, data = myData[-test.id, ]),
+               list(upper = full.model),
+               trace = 0, direction = "forward", k = log(ntrain))
+  Ytest.pred = predict(stepAIC, newdata = myData[test.id, ])
+  calculateMSPE(test.id, Ytest.pred)
+}
+
+predictWithBICBackward <- function (t) {
+  test.id = all.test.id[, t]
+  full.model = lm(Y ~ ., data = myData[-test.id, ])
+  stepAIC = step(full.model, 
+                 trace = 0,
+                 direction = "backward", 
+                 k = log(ntrain))
+  Ytest.pred = predict(stepAIC, newdata = myData[test.id, ])
+  calculateMSPE(test.id, Ytest.pred)
+}
+
+predictWithGlmnetLambdaMin <- function (alpha, t) {
+  test.id = all.test.id[, t]
+  cv.out = cv.glmnet(X[-test.id, ], Y[-test.id], alpha = 0)
+  best.lam = cv.out$lambda.min
+  Ytest.pred = predict(cv.out, 
+                       s = best.lam, 
+                       newx = X[test.id, ])
+  calculateMSPE(test.id, Ytest.pred)
+}
+
+predictWithGlmnetLambda1SE <- function (alpha, t) {
+  test.id = all.test.id[, t]
+  cv.out = cv.glmnet(X[-test.id, ], Y[-test.id], alpha = 0)
+  best.lam = cv.out$lambda.1se
+  Ytest.pred = predict(cv.out, 
+                       s = best.lam, 
+                       newx = X[test.id, ])
+  calculateMSPE(test.id, Ytest.pred)
+}
+
+predictWithRidgeLambdaMin <- function (t) {
+  predictWithGlmnetLambdaMin(0, t)
+}
+
+predictWithRidgeLambda1SE <- function (t) {
+  predictWithGlmnetLambda1SE(0, t)
+}
+
+predictWithLassoLambdaMin <- function (t) {
+  predictWithGlmnetLambdaMin(1, t)
+}
+
+predictWithLassoLambda1SE <- function (t) {
+  predictWithGlmnetLambda1SE(1, t)
+}
+
+predictWithLassoRefit <- function (t) {
+  test.id = all.test.id[, t]
+  cv.out = cv.glmnet(X[-test.id, ], Y[-test.id], alpha = 1)
+  best.lam = cv.out$lambda.1se
+  Ytest.pred = predict(cv.out, s = best.lam, newx = X[test.id, ])
+  mylasso.coef = predict(cv.out, 
+                         s = best.lam, 
+                         type = "coefficients")
+  sum(mylasso.coef != 0) - 1 # size of Lasso with lambda.1se
+
+  var.sel = row.names(mylasso.coef)[nonzeroCoef(mylasso.coef)[-1]]
+  tmp.X = X[, colnames(X) %in% var.sel]
+  mylasso.refit = coef(lm(Y[-test.id] ~ tmp.X[-test.id, ]))
+  Ytest.pred = mylasso.refit[1] + tmp.X[test.id,] %*% mylasso.refit[-1]
+  calculateMSPE(test.id, Ytest.pred)
 }
 ```
 
@@ -73,14 +175,10 @@ model.index = 1
 for (t in 1:T) {
   time.start = proc.time()
   
-  test.id = all.test.id[,t]
-  full.model = lm(Y ~ ., data = myData[-test.id,])
-  Ytest.pred = predict(full.model, newdata = myData[test.id,])
+  mspe[t, model.index] = predictWithFullModel(t)
   
   time.span = proc.time() - time.start
   computation_times[t, model.index] = time.span["elapsed"]
-  
-  mspe[t, model.index] = calculateMSPE(test.id, Ytest.pred)
 }
 ```
 
@@ -91,18 +189,11 @@ model.index = 2
 
 for (t in 1:T) {
   time.start = proc.time()
-  test.id = all.test.id[, t]
-  full.model = lm(Y ~ ., data = myData[-test.id, ])
-  stepAIC = step(lm(Y ~ 1, data = myData[-test.id, ]),
-                 list(upper = full.model),
-                 trace = 0,
-                 direction = "forward")
-  Ytest.pred = predict(stepAIC, newdata = myData[test.id, ])
+  
+  mspe[t, model.index] = predictWithAICForward(t)
   
   time.span = proc.time() - time.start
   computation_times[t, model.index] = time.span["elapsed"]
-  
-  mspe[t, model.index] = calculateMSPE(test.id, Ytest.pred)
 }
 ```
 
@@ -113,17 +204,124 @@ model.index = 3
 
 for (t in 1:T) {
   time.start = proc.time()
-  test.id = all.test.id[, t]
-  full.model = lm(Y ~ ., data = myData[-test.id, ])
-  stepAIC = step(full.model,
-                 trace = 0,
-                 direction = "backward")
-  Ytest.pred = predict(stepAIC, newdata = myData[test.id, ])
+  
+  mspe[t, model.index] = predictWithAICBackward(t)
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+}
+```
+
+* __BIC - Forward__
+
+```{r}
+model.index = 4
+
+for (t in 1:T) {
+  time.start = proc.time()
+  
+  mspe[t, model.index] = predictWithBICForward(t)
   
   time.span = proc.time() - time.start
   computation_times[t, model.index] = time.span["elapsed"]
   
-  mspe[t, model.index] = calculateMSPE(test.id, Ytest.pred)
+  
 }
 ```
 
+* __BIC - Backward
+
+```{r}
+model.index = 5
+
+for (t in 1:T) {
+  time.start = proc.time()
+  
+  mspe[t, model.index] = predictWithBICBackward(t)
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+}
+```
+
+* __Ridge - Min lambda__
+  
+```{r}
+model.index = 6
+
+for (t in 1:T) {
+  time.start = proc.time()
+  
+  mspe[t, model.index] = predictWithRidgeLambdaMin(t)
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+}
+```
+
+* __Ridge - 1SE lambda__
+
+```{r}
+model.index = 7
+
+for (t in 1:T) {
+  time.start = proc.time()
+  
+  mspe[t, model.index] = predictWithRidgeLambda1SE(t)
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+}
+```
+
+* __Lasso - Min lambda__
+
+```{r}
+model.index = 8
+
+for (t in 1:T) {
+  time.start = proc.time()
+  
+  mspe[t, model.index] = predictWithLassoLambdaMin(t)
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+}
+```
+
+* __Lasso - 1SE lambda__
+
+```{r}
+model.index = 9
+
+for (t in 1:T) {
+  time.start = proc.time()
+  
+  mspe[t, model.index] = predictWithLassoLambda1SE(t)
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+}
+```
+
+* __Lasso - Refit__
+
+```{r}
+model.index = 10
+
+for (t in 1:T) {
+  time.start = proc.time()
+  
+  mspe[t, model.index] = predictWithLassoRefit(t)
+  
+  time.span = proc.time() - time.start
+  computation_times[t, model.index] = time.span["elapsed"]
+}
+```
+
+b. Summarize your results on MSPE and model size graphically, e.g., using
+boxplot or stripchart.
+
+```{r}
+boxplot()
+```

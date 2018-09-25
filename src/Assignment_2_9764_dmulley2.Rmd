@@ -1,7 +1,18 @@
+---
+title: "Assignment 2"
+author: "Doug Mulley"
+date: "9/24/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include = FALSE}
 library(glmnet)
 library(Matrix)
 library(foreach)
-library(parallel)
 
 rm(list = ls())
 set.seed(9764)
@@ -293,6 +304,9 @@ for (t in 1:T) {
   metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
 }
 
+```
+
+```{r echo=FALSE}
 boxplot(mspe ~ model, 
         data = metrics,
         main = "Boston housing 1 - Prediction error by method",
@@ -313,6 +327,9 @@ boxplot(time ~ model,
         xlab = "Method",
         las = 2,
         ylab = "Computation time (s)")
+```
+
+```{r include=FALSE}
 
 # Boston Housing 2
 load('BostonHousing2.Rdata')
@@ -378,7 +395,9 @@ model.index = 5
 for (t in 1:T) {
   metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
 }
+```
 
+```{r echo=FALSE}
 boxplot(mspe ~ model, 
         data = metrics,
         main = "Boston housing 2 - Prediction error by method",
@@ -399,7 +418,9 @@ boxplot(time ~ model,
         xlab = "Method",
         las = 2,
         ylab = "Computation time (s)")
+```
 
+```{r include=FALSE}
 # Boston Housing 3
 
 load('BostonHousing3.Rdata')
@@ -465,7 +486,9 @@ model.index = 5
 for (t in 1:T) {
   metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
 }
+```
 
+```{r echo=FALSE}
 boxplot(mspe ~ model, 
         data = metrics,
         main = "Boston housing 3 - Prediction error by method",
@@ -486,3 +509,4 @@ boxplot(time ~ model,
         xlab = "Method",
         las = 2,
         ylab = "Computation time (s)")
+```

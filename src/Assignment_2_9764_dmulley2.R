@@ -8,6 +8,8 @@ set.seed(9764)
 
 T = 50
 
+cl = makeCluster(detectCores() - 1)
+
 calculateRowIndex <- function (model_index, t) {
   ((model_index - 1) * T) + t
 }
@@ -232,66 +234,65 @@ metrics = data.frame(rep(model_names, each = T),
 colnames(metrics) = c("model", "mspe", "time", "modelSize", 
                       "lambda_range_min", "lambda_range_max", "lambda_min", "lambda_1se")
 
+clusterExport(cl, "Housing1")
+clusterExport(cl, "n")
+clusterExport(cl, "ntrain")
+clusterExport(cl, "X")
+clusterExport(cl, "Y")
+clusterExport(cl, "allTestIds")
+clusterExport(cl, "calculateMSPE")
+clusterExport(cl, "createAndRunModel.Full")
+clusterExport(cl, "createAndRunModel.AICF")
+clusterExport(cl, "createAndRunModel.AICB")
+clusterExport(cl, "createAndRunModel.BICF")
+clusterExport(cl, "createAndRunModel.BICB")
+clusterExport(cl, "createAndRunModel.R_min")
+clusterExport(cl, "createAndRunModel.R_1se")
+clusterExport(cl, "createAndRunModel.L_min")
+clusterExport(cl, "createAndRunModel.L_1se")
+clusterExport(cl, "createAndRunModel.L_Refit")
+clusterExport(cl, "cv.glmnet")
+clusterExport(cl, "nonzeroCoef")
 
 model.index = 1
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.Full(Housing1, allTestIds[,t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.Full(Housing1, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:4] = t(results)
 
 model.index = 2
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.AICF(Housing1, allTestIds[,t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.AICF(Housing1, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:4] = t(results)
 
 model.index = 3
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.AICB(Housing1, allTestIds[,t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.AICB(Housing1, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:4] = t(results)
 
 model.index = 4
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.BICF(Housing1, allTestIds[,t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.BICF(Housing1, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:4] = t(results)
 
 model.index = 5
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.BICB(Housing1, allTestIds[,t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.BICB(Housing1, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:4] = t(results)
 
 model.index = 6
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_min(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.R_min(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 7
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.R_1se(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 8
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_min(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_min(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 9
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_1se(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 10
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_Refit(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 boxplot(mspe ~ model, 
         data = metrics,
@@ -349,35 +350,31 @@ metrics = data.frame(rep(model_names, each = T),
 colnames(metrics) = c("model", "mspe", "time", "modelSize", 
                       "lambda_range_min", "lambda_range_max", "lambda_min", "lambda_1se")
 
-model.index = 1
 
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_min(X, Y, allTestIds[, t])
-}
+clusterExport(cl, "allTestIds")
+clusterExport(cl, "ntrain")
+clusterExport(cl, "X")
+clusterExport(cl, "Y")
+
+model.index = 1
+results = parSapply(cl, 1:T, function (t) createAndRunModel.R_min(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 2
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.R_1se(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 3
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_min(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_min(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 4
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_1se(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 5
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_Refit(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 boxplot(mspe ~ model, 
         data = metrics,
@@ -436,35 +433,32 @@ metrics = data.frame(rep(model_names, each = T),
 colnames(metrics) = c("model", "mspe", "time", "modelSize", 
                       "lambda_range_min", "lambda_range_max", "lambda_min", "lambda_1se")
 
-model.index = 1
+clusterExport(cl, "allTestIds")
+clusterExport(cl, "ntrain")
+clusterExport(cl, "X")
+clusterExport(cl, "Y")
 
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_min(X, Y, allTestIds[, t])
-}
+model.index = 1
+results = parSapply(cl, 1:T, function (t) createAndRunModel.R_min(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 2
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.R_1se(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 3
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_min(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_min(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 4
-
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
-}
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_1se(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
 model.index = 5
+results = parSapply(cl, 1:T, function (t) createAndRunModel.L_Refit(X, Y, allTestIds[,t]))
+metrics[calculateRowIndex(model.index, 1):calculateRowIndex(model.index, T), 2:8] = t(results)
 
-for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
-}
+stopCluster(cl)
 
 boxplot(mspe ~ model, 
         data = metrics,

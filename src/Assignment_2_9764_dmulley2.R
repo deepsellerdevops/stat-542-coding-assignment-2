@@ -7,6 +7,8 @@ set.seed(9764)
 
 T = 50
 
+lambdas = exp(seq(-9, -3, by = 0.05))
+
 calculateRowIndex <- function (model_index, t) {
   ((model_index - 1) * T) + t
 }
@@ -86,7 +88,7 @@ createAndRunModel.BICB = function (housingData, testIds) {
 
 createAndRunModel.R_min = function (X, Y, testIds) {
   time.start = proc.time()
-  cv.out = cv.glmnet(X[-testIds, ], Y[-testIds], alpha = 0)
+  cv.out = cv.glmnet(X[-testIds, ], Y[-testIds], alpha = 0, lambda = exp(seq(-7, -1, by = 0.05)))
   best.lam = cv.out$lambda.min
   Ytest.pred = predict(cv.out, 
                        s = best.lam, 
@@ -99,12 +101,16 @@ createAndRunModel.R_min = function (X, Y, testIds) {
   
   c(calculateMSPE(Y[testIds], Ytest.pred), 
     (time.end - time.start)["elapsed"],
-    sum(d^2/(d^2 + best.lam*ntrain)))
+    sum(d^2/(d^2 + best.lam*ntrain)),
+    log(min(cv.out$lambda)),
+    log(max(cv.out$lambda)),
+    log(cv.out$lambda.min),
+    log(cv.out$lambda.1se))
 }
 
 createAndRunModel.R_1se = function (X, Y, testIds) {
   time.start = proc.time()
-  cv.out = cv.glmnet(X[-testIds, ], Y[-testIds], alpha = 0)
+  cv.out = cv.glmnet(X[-testIds, ], Y[-testIds], alpha = 0, lambda = exp(seq(-7, -1, by = 0.05)))
   best.lam = cv.out$lambda.1se
   Ytest.pred = predict(cv.out, 
                        s = best.lam, 
@@ -117,12 +123,16 @@ createAndRunModel.R_1se = function (X, Y, testIds) {
   
   c(calculateMSPE(Y[testIds], Ytest.pred), 
     (time.end - time.start)["elapsed"], 
-    sum(d^2/(d^2 + best.lam*ntrain)))
+    sum(d^2/(d^2 + best.lam*ntrain)),
+    log(min(cv.out$lambda)),
+    log(max(cv.out$lambda)),
+    log(cv.out$lambda.min),
+    log(cv.out$lambda.1se))
 }
 
 createAndRunModel.L_min = function (X, Y, testIds) {
   time.start = proc.time()
-  cv.out = cv.glmnet(X[-testIds, ], Y[-testIds], alpha = 1)
+  cv.out = cv.glmnet(X[-testIds, ], Y[-testIds], alpha = 1, lambda = exp(seq(-15, -3, by = 0.1)))
   best.lam = cv.out$lambda.min
   Ytest.pred = predict(cv.out, 
                        s = best.lam, 
@@ -133,28 +143,36 @@ createAndRunModel.L_min = function (X, Y, testIds) {
   
   c(calculateMSPE(Y[testIds], Ytest.pred), 
     (time.end - time.start)["elapsed"], 
-    sum(mylasso.coef != 0) - 1)
+    sum(mylasso.coef != 0) - 1,
+    log(min(cv.out$lambda)),
+    log(max(cv.out$lambda)),
+    log(cv.out$lambda.min),
+    log(cv.out$lambda.1se))
 }
 
 createAndRunModel.L_1se = function (X, Y, test.id) {
   time.start = proc.time()
-  cv.out = cv.glmnet(X[-test.id, ], Y[-test.id], alpha = 1)
+  cv.out = cv.glmnet(X[-test.id, ], Y[-test.id], alpha = 1, lambda = exp(seq(-15, -3, by = 0.1)))
   best.lam = cv.out$lambda.1se
   Ytest.pred = predict(cv.out, 
                        s = best.lam, 
                        newx = X[test.id, ])
-  time.end= proc.time()
+  time.end = proc.time()
   
   mylasso.coef = predict(cv.out, s = best.lam, type = "coefficients")
   
   c(calculateMSPE(Y[test.id], Ytest.pred),
     (time.end - time.start)["elapsed"], 
-    sum(mylasso.coef != 0) - 1)
+    sum(mylasso.coef != 0) - 1,
+    log(min(cv.out$lambda)),
+    log(max(cv.out$lambda)),
+    log(cv.out$lambda.min),
+    log(cv.out$lambda.1se))
 }
 
 createAndRunModel.L_Refit = function (X, Y, testIds) {
   time.start = proc.time()
-  cv.out = cv.glmnet(X[-testIds, ], Y[-testIds], alpha = 1)
+  cv.out = cv.glmnet(X[-testIds, ], Y[-testIds], alpha = 1, lambda = exp(seq(-15, -3, by = 0.1)))
   best.lam = cv.out$lambda.1se
   Ytest.pred = predict(cv.out, s = best.lam, newx = X[testIds, ])
   mylasso.coef = predict(cv.out, 
@@ -169,7 +187,11 @@ createAndRunModel.L_Refit = function (X, Y, testIds) {
   
   c(calculateMSPE(Y[testIds], Ytest.pred), 
     (time.end - time.start)["elapsed"], 
-    sum(mylasso.coef != 0) - 1)
+    sum(mylasso.coef != 0) - 1,
+    log(min(cv.out$lambda)),
+    log(max(cv.out$lambda)),
+    log(cv.out$lambda.min),
+    log(cv.out$lambda.1se))
 }
 
 ## Boston Housing 1
@@ -200,8 +222,16 @@ model_names = c("Full",
 
 nmodels = length(model_names)
 
-metrics = data.frame(rep(model_names, each = T), numeric(nmodels * T), numeric(nmodels * T), numeric(nmodels * T))
-colnames(metrics) = c("model", "mspe", "time", "modelSize")
+metrics = data.frame(rep(model_names, each = T), 
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T))
+colnames(metrics) = c("model", "mspe", "time", "modelSize", 
+                      "lambda_range_min", "lambda_range_max", "lambda_min", "lambda_1se")
 
 
 model.index = 1
@@ -237,31 +267,31 @@ for (t in 1:T) {
 model.index = 6
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.R_min(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_min(X, Y, allTestIds[, t])
 }
 
 model.index = 7
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
 }
 
 model.index = 8
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_min(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_min(X, Y, allTestIds[, t])
 }
 
 model.index = 9
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
 }
 
 model.index = 10
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
 }
 
 boxplot(mspe ~ model, 
@@ -309,37 +339,45 @@ model_names = c("R.min", "R.1se",
 
 nmodels = length(model_names)
 
-metrics = data.frame(rep(model_names, each = T), numeric(nmodels * T), numeric(nmodels * T), numeric(nmodels * T))
-colnames(metrics) = c("model", "mspe", "time", "modelSize")
+metrics = data.frame(rep(model_names, each = T), 
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T))
+colnames(metrics) = c("model", "mspe", "time", "modelSize", 
+                      "lambda_range_min", "lambda_range_max", "lambda_min", "lambda_1se")
 
 model.index = 1
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.R_min(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_min(X, Y, allTestIds[, t])
 }
 
 model.index = 2
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
 }
 
 model.index = 3
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_min(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_min(X, Y, allTestIds[, t])
 }
 
 model.index = 4
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
 }
 
 model.index = 5
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
 }
 
 boxplot(mspe ~ model, 
@@ -388,37 +426,45 @@ model_names = c("R.min", "R.1se",
 
 nmodels = length(model_names)
 
-metrics = data.frame(rep(model_names, each = T), numeric(nmodels * T), numeric(nmodels * T), numeric(nmodels * T))
-colnames(metrics) = c("model", "mspe", "time", "modelSize")
+metrics = data.frame(rep(model_names, each = T), 
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T),
+                     numeric(nmodels * T))
+colnames(metrics) = c("model", "mspe", "time", "modelSize", 
+                      "lambda_range_min", "lambda_range_max", "lambda_min", "lambda_1se")
 
 model.index = 1
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.R_min(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_min(X, Y, allTestIds[, t])
 }
 
 model.index = 2
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.R_1se(X, Y, allTestIds[, t])
 }
 
 model.index = 3
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_min(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_min(X, Y, allTestIds[, t])
 }
 
 model.index = 4
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_1se(X, Y, allTestIds[, t])
 }
 
 model.index = 5
 
 for (t in 1:T) {
-  metrics[calculateRowIndex(model.index, t), 2:4] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
+  metrics[calculateRowIndex(model.index, t), 2:8] = createAndRunModel.L_Refit(X, Y, allTestIds[, t])
 }
 
 boxplot(mspe ~ model, 
